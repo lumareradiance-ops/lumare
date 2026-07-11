@@ -10,11 +10,11 @@ from app.database import Base
 
 
 def gen_id():
-      return str(uuid.uuid4())
+        return str(uuid.uuid4())
 
 
 class Product(Base):
-      __tablename__ = "products"
+        __tablename__ = "products"
 
     id = Column(String, primary_key=True, default=gen_id)
     sku = Column(String, unique=True, index=True, nullable=False)
@@ -31,7 +31,7 @@ class Product(Base):
 
 
 class User(Base):
-      __tablename__ = "users"
+        __tablename__ = "users"
 
     id = Column(String, primary_key=True, default=gen_id)
     name = Column(String, nullable=False)
@@ -43,7 +43,7 @@ class User(Base):
 
 
 class Order(Base):
-      __tablename__ = "orders"
+        __tablename__ = "orders"
 
     id = Column(String, primary_key=True, default=gen_id)
     order_number = Column(String, unique=True, index=True, nullable=False)
@@ -73,7 +73,7 @@ class Order(Base):
     awb_code = Column(String, nullable=True)
     tracking_url = Column(String, nullable=True)
 
-    zoho_invoice_id = Column(String, nullable=True)
+    odoo_invoice_id = Column(String, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -82,7 +82,7 @@ class Order(Base):
 
 
 class OrderItem(Base):
-      __tablename__ = "order_items"
+        __tablename__ = "order_items"
 
     id = Column(String, primary_key=True, default=gen_id)
     order_id = Column(String, ForeignKey("orders.id"), nullable=False)
