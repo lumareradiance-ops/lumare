@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lumare Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, Inter, sans-serif; background: #FAF8F2; color: #1B1B18; padding: 32px; }
+  h1 { font-size: 1.4rem; margin-bottom: 4px; }
+  .sub { color: #68655C; font-size: 0.85rem; margin-bottom: 24px; }
+  .login-box { max-width: 360px; margin: 80px auto; background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 24px; }
+  .login-box input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px; }
+  .login-box button, .refresh { background: #2B3D32; color: #fff; border: none; padding: 10px 18px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.85rem; }
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .stat { background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 16px; }
+  .stat .label { font-size: 0.72rem; color: #68655C; text-transform: uppercase; letter-spacing: 0.04em; }
+  .stat .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
+  section { background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+  section h2 { font-size: 1rem; margin-bottom: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #f0f0f0; }
+  th { color: #68655C; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
+  .badge { padding: 3px 8px; border-radius: 100px; font-size: 0.7rem; font-weight: 700; }
+  .badge.paid { background: #E1F5EE; color: #085041; }
+  .badge.pending, .badge.cod_pending { background: #FAEEDA; color: #854F0B; }
+  .badge.failed { background: #FCEBEB; color: #791F1F; }
+  #app { display: none; }
+  #error { color: #A32D2D; margin-top: 8px; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+
+<div class="login-box" id="login-box">
+  <h1>Lumare Admin</h1>
+  <p class="sub">Sign in with your admin account.</p>
+  <input type="email" id="email" placeholder="admin@lumare.in">
+  <input type="password" id="password" placeholder="Password">
+  <button onclick="login()">Sign in</button>
+  <div id="error"></div>
+</div>
+
+<div id="app">
+  <h1>Lumare Admin Dashboard</h1>
+  <p class="sub">Orders, inventory, and fulfillment — refreshed on load. <button class="refresh" onclick="loadAll()">Refresh</button></p>
+
+  <div class="stat-grid" id="stats"></div>
+
+  <section>
+    <h2>Pending shipments</h2>
+    <table id="pending-table"><thead><tr><th>Order</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section>
+    <h2>COD collections outstanding</h2>
+    <div id="cod-summary"></div>
+  </section>
+
+  <section>
+    <h2>Inventory</h2>
+    <table id="inventory-table"><thead><tr><th>SKU</th><th>Name</th><th>Stock</th><th>Price</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section>
+    <h2>All orders</h2>
+    <table id="orders-table"><thead><tr><th>Order</th><th>Customer</th><th>Total</th><th>Payment</th><th>Fulfillment</th><th>Date</th></tr></thead><tbody></tbody></table>
+  </section>
+</div>
+
+<script>
+  const API_BASE = window.LUMARE_API_BASE || 'http://localhost:8000/api';
+  let token = localStorage.getItem('lumare_admin_token') || '';
+
+  async function login(){
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    try{
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ email, password })
+      });
+      if(!res.ok){ throw new Error('Invalid credentials'); }
+      const data = await res.json();
+      if(!data.user.is_admin){ throw new Error('This account is not an admin'); }
+      token = data.token;
+      localStorage.setItem('lumare_admin_token', token);
+      showApp();
+    }catch(e){
+      document.getElementById('error').textContent = e.message;
+    }
+  }
+
+  function authHeaders(){
+    return { 'Authorization': `Bearer ${token}` };
+  }
+
+  function showApp(){
+    document.getElementById('login-box').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    loadAll();
+  }
+
+  async function loadAll(){
+    try{
+      const [summary, pending, cod, inventory, orders] = await Promise.all([
+        fetch(`${API_BASE}/admin/summary`, { headers: authHeaders() }).then(r => r.json()),
+        fetch(`${API_BASE}/admin/pending-shipments`, { headers: authHeaders() }).then(r => r.json()),
+        fetch(`${API_BASE}/admin/cod-collections`, { headers: authHeaders() }).then(r => r.json()),
+        fetch(`${API_BASE}/admin/inventory`, { headers: authHeaders() }).then(r => r.json()),
+        fetch(`${API_BASE}/admin/orders`, { headers: authHeaders() }).then(r => r.json()),
+      ]);
+      renderStats(summary);
+      renderPending(pending);
+      renderCod(cod);
+      renderInventory(inventory);
+      renderOrders(orders);
+    }catch(e){
+      alert('Could not load dashboard data — is the backend running at ' + API_BASE + '?');
+    }
+  }
+
+  function renderStats(s){
+    document.getElementById('stats').innerHTML = `
+      <div class="stat"><div class="label">Total orders</div><div class="value">${s.total_orders}</div></div>
+      <div class="stat"><div class="label">Paid orders</div><div class="value">${s.paid_orders}</div></div>
+      <div class="stat"><div class="label">Revenue</div><div class="value">₹${s.total_revenue_inr}</div></div>
+      <div class="stat"><div class="label">Low stock SKUs</div><div class="value">${s.low_stock_products}</div></div>
+    `;
+  }
+
+  function renderPending(orders){
+    document.querySelector('#pending-table tbody').innerHTML = orders.map(o => `
+      <tr><td>${o.order_number}</td><td>${o.customer_name}</td><td>₹${o.total_inr}</td><td><span class="badge ${o.fulfillment_status}">${o.fulfillment_status}</span></td></tr>
+    `).join('') || '<tr><td colspan="4">Nothing pending.</td></tr>';
+  }
+
+  function renderCod(cod){
+    document.getElementById('cod-summary').innerHTML = `
+      <p><strong>${cod.pending_order_count}</strong> orders, <strong>₹${cod.pending_amount_inr}</strong> outstanding.</p>
+    `;
+  }
+
+  function renderInventory(products){
+    document.querySelector('#inventory-table tbody').innerHTML = products.map(p => `
+      <tr><td>${p.sku}</td><td>${p.name}</td><td>${p.stock}</td><td>₹${p.price_inr}</td></tr>
+    `).join('');
+  }
+
+  function renderOrders(orders){
+    document.querySelector('#orders-table tbody').innerHTML = orders.map(o => `
+      <tr>
+        <td>${o.order_number}</td><td>${o.customer_name}</td><td>₹${o.total_inr}</td>
+        <td><span class="badge ${o.payment_status}">${o.payment_status}</span></td>
+        <td>${o.fulfillment_status}</td>
+        <td>${new Date(o.created_at).toLocaleDateString()}</td>
+      </tr>
+    `).join('');
+  }
+
+  if(token){ showApp(); }
+</script>
+
+</body>
+</html>
