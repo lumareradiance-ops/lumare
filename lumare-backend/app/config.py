@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-          database_url: str = "postgresql://user:password@localhost:5432/lumare"
+    database_url: str = "postgresql://user:password@localhost:5432/lumare"
 
     jwt_secret: str = "dev-secret-change-me"
     jwt_expire_minutes: int = 10080
@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:3000"
 
     class Config:
-                  env_file = ".env"
+        env_file = ".env"
 
 
 settings = Settings()
