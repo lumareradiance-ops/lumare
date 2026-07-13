@@ -19,7 +19,7 @@ app.add_middleware(
         "http://127.0.0.1:5500",
         "null",  # covers frontend opened directly as a file:// URL during local dev
     ],
-    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.github\.io|https://.*\.up\.railway\.app",
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.github\.io|https://.*\.up\.railway\.app|https://.*\.netlify\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
