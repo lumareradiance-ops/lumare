@@ -19,6 +19,7 @@ app.add_middleware(
         "http://127.0.0.1:5500",
         "null",  # covers frontend opened directly as a file:// URL during local dev
     ],
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.github\.io|https://.*\.up\.railway\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -30,6 +31,17 @@ app.include_router(orders.router)
 app.include_router(webhooks.router)
 app.include_router(shipping.router)
 app.include_router(admin.router)
+
+
+@app.on_event("startup")
+def _seed_on_startup():
+    # Populate the initial catalog + admin once. Safe to run on every boot:
+    # the seed logic checks for existing rows before inserting, and any failure
+    # here is swallowed so it can never prevent the app from starting.
+    try:
+        from app import seed  # noqa: F401  (import side-effect runs the seed)
+    except Exception:
+        pass
 
 
 @app.get("/api/health")
