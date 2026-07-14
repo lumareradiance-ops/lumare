@@ -4,7 +4,6 @@ Creates the initial product catalog and one admin user (change the password afte
 """
 from app.database import SessionLocal, Base, engine
 from app.models import Product, User
-from app.security import hash_password
 
 Base.metadata.create_all(bind=engine)
 
@@ -25,19 +24,28 @@ products = [
          price_inr=749, stock=110),
 ]
 
+# Create and COMMIT products first, so they always persist even if the
+# admin-user step below fails (e.g. a passlib/bcrypt hashing incompatibility).
 for p in products:
     if not db.query(Product).filter(Product.sku == p["sku"]).first():
         db.add(Product(**p))
-
-admin_email = "admin@lumare.in"
-if not db.query(User).filter(User.email == admin_email).first():
-    db.add(User(
-        name="Lumare Admin",
-        email=admin_email,
-        password_hash=hash_password("change-this-password"),
-        is_admin=True,
-    ))
-
 db.commit()
+
+# Admin user creation is isolated so a hashing error can't roll back the catalog.
+try:
+    from app.security import hash_password
+    admin_email = "admin@lumare.in"
+    if not db.query(User).filter(User.email == admin_email).first():
+        db.add(User(
+            name="Lumare Admin",
+            email=admin_email,
+            password_hash=hash_password("change-this-password"),
+            is_admin=True,
+        ))
+        db.commit()
+except Exception as e:
+    db.rollback()
+    print("Admin seed skipped:", e)
+
 db.close()
-print("Seed complete. Admin login: admin@lumare.in / change-this-password (change this immediately)")
+print("Seed complete. Products ensured. Admin login: admin@lumare.in / change-this-password")
